@@ -1,0 +1,157 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/* Bundled, not fetched: the app has to look right with no network. One face
+   for the whole app - figures are set tabular where columns need to line up. */
+@import "@fontsource/rajdhani/400.css";
+@import "@fontsource/rajdhani/500.css";
+@import "@fontsource/rajdhani/600.css";
+@import "@fontsource/rajdhani/700.css";
+
+/**
+ * One dark palette, no light mode. This is a console utility that sits next to
+ * the hardware, and the hardware is black.
+ *
+ * `accent` is RØDE's red. The three cell states get colours of their own so a
+ * glance across a row reads as link / unlink / mute without any text.
+ */
+@theme {
+  --color-chrome: #0d0e10;
+  --color-panel: #131518;
+  --color-well: #080909;
+
+  --color-ink: #eceef0;
+  --color-ink-2: #cfd4d8;
+  --color-ink-3: #9aa1a7;
+  --color-ink-4: #71787f;
+  --color-ink-5: #61686e;
+
+  --color-accent: #e8442f;
+  --color-link: #37d67a;
+  --color-unlink: #4c8dff;
+  --color-mute: #e5484d;
+  --color-warn: #f5a524;
+
+  --font-sans: "Rajdhani", system-ui, sans-serif;
+}
+
+html,
+body,
+#__nuxt {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-chrome);
+  color: var(--color-ink-2);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Nothing in this app is a text document; dragging a label should not select it. */
+body {
+  user-select: none;
+  cursor: default;
+}
+input,
+.selectable {
+  user-select: text;
+}
+
+/* Nuxt UI's tooltip ships as a single fixed-height line: `h-6` on the content
+   and `truncate` on the text. Most tooltips in this app are a sentence or two,
+   so they need a block that grows. Written as plain CSS rather than utilities
+   because it has to beat the theme's own classes regardless of merge order. */
+.rc-tip {
+  height: auto;
+  min-height: 0;
+  max-width: 22rem;
+  align-items: flex-start;
+}
+.rc-tip [data-slot="text"] {
+  overflow: visible;
+  text-overflow: clip;
+  /* `pre-line`, not `normal`: the matrix builds its tooltips by joining lines
+     with 
+, the way a native title attribute wants them. `normal` collapses
+     those into one run-on paragraph. This keeps the breaks and still wraps
+     anything longer than the max-width above. */
+  white-space: pre-line;
+  line-height: 1.35;
+}
+
+/* The monitor volume slider. Native range inputs do not match anything else
+   here, and this one sits in the bar next to the mute button. */
+.monitor-slider {
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.12);
+  cursor: pointer;
+}
+.monitor-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-ink-2);
+  border: 0;
+  transition: background 0.12s;
+}
+.monitor-slider:hover::-webkit-slider-thumb {
+  background: var(--color-ink);
+}
+.monitor-slider:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.monitor-slider:disabled::-webkit-slider-thumb {
+  background: var(--color-ink-5);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.13);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.22);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@utility panel {
+  border-radius: 14px;
+  background: var(--color-panel);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.055);
+}
+
+/* Outputs on Main Mix or Mix Minus carry every channel: their cells are stored
+   but inert, so the whole row reads as hatched rather than solid. */
+@utility hatched {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(255 255 255 / 0.05) 0 3px,
+    rgb(255 255 255 / 0) 3px 6px
+  );
+}
+
+@utility caps {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

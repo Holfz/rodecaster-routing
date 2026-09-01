@@ -1,0 +1,12 @@
+# Rust build output, wherever it lands.
+target/
+
+# Frontend
+ui/node_modules/
+ui/.nuxt/
+ui/.output/
+ui/dist/
+src-tauri/gen/
+
+/.idea
+/dev/

@@ -1,0 +1,10 @@
+[package]
+name = "rcp-proto"
+description = "Frame and value encoding for the RODECaster Pro II vendor HID interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# No dependencies on purpose. This crate is the wire format and nothing else,
+# so the protocol and its tests build without hidapi or any platform I/O.
+[dependencies]

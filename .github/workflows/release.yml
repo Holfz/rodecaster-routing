@@ -1,0 +1,89 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # So a build can be checked without cutting a tag first.
+  workflow_dispatch:
+
+# Needed to create the release and attach the installer.
+permissions:
+  contents: write
+
+jobs:
+  msi:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # dev/ is gitignored, so this runner has exactly what a stranger cloning
+      # the repo gets. If the build needs something only present locally, it
+      # fails here rather than in someone else's hands.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install frontend dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      # The two tests that read a captured dump sit behind #[ignore], so they
+      # report as ignored here rather than passing on a file that is absent.
+      - name: Test
+        run: cargo test --workspace
+
+      # The tag is the version. Windows Installer will not take a semver
+      # prerelease suffix, so the MSI gets the numeric part and the release
+      # keeps the whole tag.
+      - name: Version from tag
+        id: ver
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+            echo "msi=${V%%-*}" >> "$GITHUB_OUTPUT"
+            echo "full=$V" >> "$GITHUB_OUTPUT"
+          else
+            echo "msi=" >> "$GITHUB_OUTPUT"
+            echo "full=(from tauri.conf.json)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Builds the frontend and bundles the MSI. WiX is fetched by the Tauri
+      # CLI on first use. Without a tag the version in tauri.conf.json stands.
+      - name: Build
+        working-directory: ui
+        shell: bash
+        run: |
+          if [ -n "${{ steps.ver.outputs.msi }}" ]; then
+            pnpm tauri build --config "{\"version\":\"${{ steps.ver.outputs.msi }}\"}"
+          else
+            pnpm app:build
+          fi
+
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/bundle/msi/*.msi
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      # A manual run has no tag to attach to, so keep the installer here.
+      - name: Upload
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: rodecaster-routing-msi
+          path: target/release/bundle/msi/*.msi
+          if-no-files-found: error

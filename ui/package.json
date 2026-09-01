@@ -1,0 +1,23 @@
+{
+  "name": "rodecaster-deck-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "tauri": "cd .. && tauri",
+    "app": "cd .. && tauri dev",
+    "app:build": "cd .. && tauri build"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.11.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "nuxt": "^4",
+    "vue": "^3"
+  },
+  "devDependencies": {
+    "@fontsource/rajdhani": "^5.3.0",
+    "@tauri-apps/cli": "^2"
+  }
+}

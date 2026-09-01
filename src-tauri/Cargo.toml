@@ -1,0 +1,22 @@
+[package]
+name = "rodecaster-deck"
+description = "Routing matrix for the RODECaster Pro II"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri-plugin-autostart = "2.5.1"
+rcp-proto = { workspace = true }
+rcp-model = { workspace = true }
+rcp-transport = { workspace = true }
+
+[features]
+# Used by `tauri build --debug`.
+custom-protocol = ["tauri/custom-protocol"]

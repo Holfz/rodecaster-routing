@@ -1,0 +1,20 @@
+[workspace]
+members = ["crates/*", "src-tauri"]
+# dev/ is its own workspace and is gitignored, so it must not be a member here:
+# cargo resolves every member before doing anything, and a missing directory
+# would break the build for anyone cloning the public repo.
+exclude = ["dev"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.1"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+rcp-proto = { path = "crates/rcp-proto" }
+rcp-model = { path = "crates/rcp-model" }
+rcp-transport = { path = "crates/rcp-transport" }
+hidapi = "2.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

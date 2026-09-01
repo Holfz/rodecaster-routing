@@ -1,0 +1,11 @@
+[package]
+name = "rcp-transport"
+description = "USB HID transport for the RODECaster Pro II vendor interface"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rcp-proto = { workspace = true }
+rcp-model = { workspace = true }
+hidapi = { workspace = true }

@@ -1,0 +1,5 @@
+# esbuild ships its platform binary via an install script. Without this, pnpm
+# exits non-zero and Nuxt's dependency check aborts the build.
+allowBuilds:
+  esbuild: true
+  vue-demi: true
