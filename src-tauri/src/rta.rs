@@ -22,12 +22,7 @@ pub(crate) type Rta = Mutex<Option<Capture>>;
 pub(crate) fn list_capture_devices() -> Result<Vec<CaptureDeviceDto>, String> {
     Ok(rcp_rta::input_devices()?
         .into_iter()
-        .map(|d| CaptureDeviceDto {
-            name: d.name,
-            default: d.default,
-            channels: d.channels,
-            sample_rate: d.sample_rate,
-        })
+        .map(|d| CaptureDeviceDto { name: d.name, default: d.default })
         .collect())
 }
 

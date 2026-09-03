@@ -219,9 +219,8 @@ pub(crate) struct FrameDto {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CaptureDeviceDto {
     pub(crate) name: String,
+    /// The host's default input, marked in the list the way a chat client does.
     pub(crate) default: bool,
-    pub(crate) channels: u16,
-    pub(crate) sample_rate: u32,
 }
 
 /// What the analyser opened, sent once when capture starts.

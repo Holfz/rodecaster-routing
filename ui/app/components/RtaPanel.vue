@@ -257,9 +257,9 @@ function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, x: Scale,
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   for (const hz of GRID_HZ) {
-    // The scale runs between band centres, so 20 Hz and 20 kHz land half a band
-    // outside it. Those get pulled back into view; a mark genuinely off the
-    // scale, as 20 kHz is on a device that samples too slowly for it, is not.
+    // The scale runs between band centres, so 20 Hz and 20 kHz fall half a band
+    // outside it and are pulled back in. A device sampling too slowly for
+    // 20 kHz puts it far outside, and that one is dropped.
     const exact = x(hz)
     if (exact < -8 || exact > w + 8) continue
     const at = Math.min(Math.max(Math.round(exact), 0), w - 1) + 0.5
@@ -269,8 +269,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, w: number, h: number, x: Scale,
     ctx.lineTo(at, h - 14)
     ctx.stroke()
 
-    // 20 Hz and 20 kHz sit on the edges, where a centred label would be cut in
-    // half, so the text is pulled back inside while the line stays put.
+    // The line stays on the edge; only the text comes in, or half of it would
+    // be cut off.
     const label = hz < 1000 ? String(hz) : `${hz / 1000}k`
     ctx.fillText(label, Math.min(Math.max(at, 14), w - 14), h - 2)
   }
@@ -398,7 +398,9 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
             @change="restart"
           >
             <option v-if="!devices.length" value="">No capture device</option>
-            <option v-for="d in devices" :key="d.name" :value="d.name">{{ d.name }}</option>
+            <option v-for="d in devices" :key="d.name" :value="d.name">
+              {{ d.name }}{{ d.default ? ' (system default)' : '' }}
+            </option>
           </select>
         </UTooltip>
       </div>

@@ -155,8 +155,6 @@ export interface CaptureDevice {
   name: string
   /** The host's default input. */
   default: boolean
-  channels: number
-  sampleRate: number
 }
 
 /** What the analyser opened, sent once when capture starts. */

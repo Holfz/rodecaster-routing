@@ -22,8 +22,6 @@ pub struct DeviceInfo {
     pub name: String,
     /// The host's default input, which is what a chat client starts on.
     pub default: bool,
-    pub channels: u16,
-    pub sample_rate: u32,
 }
 
 /// What the stream actually opened as, which is not always what was asked for.
@@ -48,16 +46,13 @@ pub fn input_devices() -> Result<Vec<DeviceInfo>, String> {
 
     let devices = host.input_devices().map_err(|e| e.to_string())?;
 
+    // Named only: asking each device for its format here would drop any that
+    // will not answer, and a device missing from the list cannot be chosen at
+    // all. One that will not open reports why when it is opened.
     Ok(devices
         .filter_map(|device| {
             let name = device.name().ok()?;
-            let config = device.default_input_config().ok()?;
-            Some(DeviceInfo {
-                default: Some(&name) == default.as_ref(),
-                name,
-                channels: config.channels(),
-                sample_rate: config.sample_rate().0,
-            })
+            Some(DeviceInfo { default: Some(&name) == default.as_ref(), name })
         })
         .collect())
 }
@@ -166,8 +161,7 @@ where
     T: SizedSample,
     f32: FromSample<T>,
 {
-    // One closure holds both callbacks, so the shared handle is what makes a
-    // stream error reach the same place a frame does.
+    // Shared so that a stream error reports to the same caller a frame does.
     let sink = Arc::new(std::sync::Mutex::new(on_event));
     let failed = sink.clone();
 
@@ -217,8 +211,7 @@ fn pick(host: &cpal::Host, wanted: Option<&str>) -> Result<cpal::Device, String>
 /// Which endpoint to start on when none has been chosen.
 ///
 /// Comms first: it is the bus that can carry the microphone alone without
-/// disturbing the main mix. Failing that any RØDECaster endpoint, then whatever
-/// is first, which on WASAPI is the host's default input.
+/// disturbing the main mix.
 fn preferred(names: &[String]) -> Option<usize> {
     let matching = |needles: &[&str]| {
         names.iter().position(|name| {

@@ -178,9 +178,8 @@ fn plan_bands(sample_rate: f32) -> (Vec<Band>, Vec<f32>) {
         let mut lo = (low / bin_hz).ceil() as usize;
         let mut hi = (high / bin_hz).floor() as usize + 1;
 
-        // A band under the bin spacing covers no bin of its own, so it reads
-        // the nearest one and neighbouring bands repeat it. That is the real
-        // resolution at the bottom of the range, not a gap in the curve.
+        // A band under the bin spacing has no bin of its own, so it repeats the
+        // nearest. That staircase at the low end is the resolution, not a gap.
         if hi <= lo {
             lo = (centre / bin_hz).round() as usize;
             hi = lo + 1;
