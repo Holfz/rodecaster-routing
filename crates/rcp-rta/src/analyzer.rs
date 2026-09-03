@@ -37,11 +37,16 @@ pub struct Frame {
     pub clipped: bool,
 }
 
-/// The bins one display band covers, as a half-open range. Never empty: a band
-/// narrower than the bin spacing takes the nearest bin instead.
-struct Band {
-    lo: usize,
-    hi: usize,
+/// Where one display band reads its level.
+enum Band {
+    /// Wide enough to cover bins of its own, so it takes the loudest of them.
+    Bins { lo: usize, hi: usize },
+    /// Narrower than the bin spacing, which every band below about 200 Hz is at
+    /// this window length. There is nothing to pick from, so the value comes
+    /// from the two bins either side of the band's centre. Snapping to the
+    /// nearer one instead makes neighbouring bands repeat a value, which draws
+    /// as a staircase along the bottom octaves.
+    Between { lo: usize, weight: f32 },
 }
 
 pub struct Analyzer {
@@ -133,11 +138,18 @@ impl Analyzer {
             .bands
             .iter()
             .map(|band| {
-                let power = self.spectrum[band.lo..band.hi]
-                    .iter()
-                    .map(|c| c.norm_sqr())
-                    .fold(0.0f32, f32::max);
-                to_db(power.sqrt() * self.scale)
+                let amplitude = match *band {
+                    Band::Bins { lo, hi } => self.spectrum[lo..hi]
+                        .iter()
+                        .map(|c| c.norm_sqr())
+                        .fold(0.0f32, f32::max)
+                        .sqrt(),
+                    Band::Between { lo, weight } => {
+                        let (below, above) = (self.spectrum[lo].norm(), self.spectrum[lo + 1].norm());
+                        below + (above - below) * weight
+                    }
+                };
+                to_db(amplitude * self.scale)
             })
             .collect();
 
@@ -175,20 +187,18 @@ fn plan_bands(sample_rate: f32) -> (Vec<Band>, Vec<f32>) {
         let (low, high) = (edge(k), edge(k + 1));
         let centre = (low * high).sqrt();
 
-        let mut lo = (low / bin_hz).ceil() as usize;
-        let mut hi = (high / bin_hz).floor() as usize + 1;
+        let lo = (low / bin_hz).ceil() as usize;
+        let hi = (high / bin_hz).floor() as usize + 1;
 
-        // A band under the bin spacing has no bin of its own, so it repeats the
-        // nearest. That staircase at the low end is the resolution, not a gap.
-        if hi <= lo {
-            lo = (centre / bin_hz).round() as usize;
-            hi = lo + 1;
-        }
-
-        let lo = lo.clamp(1, last);
-        let hi = hi.clamp(lo + 1, last + 1);
-
-        bands.push(Band { lo, hi });
+        bands.push(if hi > lo {
+            Band::Bins { lo: lo.clamp(1, last), hi: hi.clamp(lo.clamp(1, last) + 1, last + 1) }
+        } else {
+            let position = centre / bin_hz;
+            Band::Between {
+                lo: (position.floor() as usize).clamp(1, last - 1),
+                weight: position.fract(),
+            }
+        });
         centres.push(centre);
     }
 
@@ -229,7 +239,10 @@ mod tests {
         Analyzer::new(SR)
             .bands
             .iter()
-            .position(|b| (b.lo..b.hi).contains(&bin))
+            .position(|b| match *b {
+                Band::Bins { lo, hi } => (lo..hi).contains(&bin),
+                Band::Between { lo, .. } => lo == bin || lo + 1 == bin,
+            })
             .unwrap_or_else(|| panic!("{freq} Hz is outside every band"))
     }
 
@@ -297,9 +310,42 @@ mod tests {
             assert!(pair[1] > pair[0]);
         }
         for band in &rta.bands {
-            assert!(band.hi > band.lo);
-            assert!(band.hi <= FFT_SIZE / 2);
+            match *band {
+                Band::Bins { lo, hi } => {
+                    assert!(hi > lo);
+                    assert!(hi <= FFT_SIZE / 2);
+                }
+                Band::Between { lo, weight } => {
+                    assert!(lo >= 1 && lo + 1 < FFT_SIZE / 2);
+                    assert!((0.0..1.0).contains(&weight), "weight {weight}");
+                }
+            }
         }
+    }
+
+    /// A band narrower than a bin used to snap to the nearest one, so a run of
+    /// neighbouring bands read exactly alike and drew as steps.
+    #[test]
+    fn the_bottom_octaves_interpolate_rather_than_repeat() {
+        let frame = analyse(sine(on_bin(10), 1.0));
+        let rta = Analyzer::new(SR);
+
+        // Bands away from the tone all sit on the floor, and equal neighbours
+        // there say nothing. The skirt around it is where repetition showed.
+        let skirt: Vec<f32> = rta
+            .centres()
+            .iter()
+            .enumerate()
+            .filter(|(_, &hz)| (30.0..120.0).contains(&hz))
+            .map(|(i, _)| frame.db[i])
+            .filter(|&db| db > FLOOR_DB)
+            .collect();
+
+        assert!(skirt.len() > 8, "only {} bands carry the tone", skirt.len());
+        assert!(
+            skirt.windows(2).all(|pair| pair[0] != pair[1]),
+            "neighbouring bands repeat: {skirt:?}"
+        );
     }
 
     /// A device running at 44.1 kHz cannot show 20 kHz, and its top band must

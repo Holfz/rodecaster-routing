@@ -30,7 +30,8 @@ const starting = ref(false)
 const frozen = ref(false)
 const peakHold = ref(true)
 const smoothing = ref<Smoothing>('normal')
-const peakDb = ref(FLOOR)
+const currentDb = ref(FLOOR)
+const heldDb = ref(FLOOR)
 const clipping = ref(false)
 
 /**
@@ -39,10 +40,19 @@ const clipping = ref(false)
  * thing that has to change is the canvas.
  */
 let latest: number[] | null = null
+let latestPeak = FLOOR
+let latestClipped = false
 let levels = new Float32Array(0)
 let peaks = new Float32Array(0)
 let ages = new Float32Array(0)
 let cursorX: number | null = null
+
+/** The two readouts, before they are throttled onto the refs above. */
+let levelNow = FLOOR
+let levelHeld = FLOOR
+let heldAge = 0
+let clipAge = Infinity
+let lastReadout = 0
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const plot = ref<HTMLElement | null>(null)
@@ -73,6 +83,14 @@ watch([chosen, smoothing, peakHold], () => {
   }
 })
 
+/** The host's default is marked, the way a chat client marks it. */
+const deviceItems = computed(() =>
+  devices.value.map(d => ({
+    label: d.default ? `${d.name} [System Default]` : d.name,
+    value: d.name,
+  })),
+)
+
 async function start() {
   starting.value = true
   info.value = null
@@ -91,6 +109,12 @@ async function start() {
     levels = new Float32Array(bands).fill(FLOOR)
     peaks = new Float32Array(bands).fill(FLOOR)
     ages = new Float32Array(bands)
+
+    latestPeak = FLOOR
+    latestClipped = false
+    levelNow = FLOOR
+    levelHeld = FLOOR
+    clipAge = Infinity
   } catch (e) {
     emit('error', String(e))
   } finally {
@@ -116,8 +140,8 @@ onMounted(async () => {
     await listen<RtaFrame>('rta-frame', e => {
       if (frozen.value) return
       latest = e.payload.db
-      peakDb.value = e.payload.peakDb
-      clipping.value = e.payload.clipped
+      latestPeak = e.payload.peakDb
+      latestClipped = e.payload.clipped
     }),
     // The stream can fail after it opened, typically the device going away.
     await listen<string>('rta-error', e => emit('error', `Capture stopped: ${e.payload}`)),
@@ -209,6 +233,32 @@ function advance(seconds: number) {
     ages[i] = age
     if (age > HOLD_SECONDS) peaks[i] = peak - FALL_DB_PER_SECOND * seconds
   }
+
+  advanceReadout(seconds, rise, fall)
+}
+
+/**
+ * The level readout: the loudest sample in the last frame, and the highest that
+ * has been in the seconds since.
+ *
+ * Held on the same terms as the curve's peak trace. A number that only ever
+ * showed the current frame would be unreadable at 23 frames a second, and the
+ * held one is what a gain is set against.
+ */
+function advanceReadout(seconds: number, rise: number, fall: number) {
+  levelNow += (latestPeak - levelNow) * (latestPeak > levelNow ? rise : fall)
+
+  if (levelNow >= levelHeld) {
+    levelHeld = levelNow
+    heldAge = 0
+  } else {
+    heldAge += seconds
+    if (heldAge > HOLD_SECONDS) levelHeld -= FALL_DB_PER_SECOND * seconds
+  }
+
+  // A frame is 43 ms, so an unlatched indicator would light for less time than
+  // it takes to look at it.
+  clipAge = latestClipped ? 0 : clipAge + seconds
 }
 
 type Scale = (v: number) => number
@@ -223,6 +273,15 @@ function draw(now: number) {
   const seconds = lastDraw ? Math.min((now - lastDraw) / 1000, 0.25) : 0
   lastDraw = now
   advance(seconds)
+
+  // Text, unlike the canvas, costs a Vue render to change. Ten times a second
+  // is already faster than a number can be read.
+  if (now - lastReadout > 100) {
+    lastReadout = now
+    currentDb.value = levelNow
+    heldDb.value = levelHeld
+    clipping.value = clipAge < HOLD_SECONDS
+  }
 
   const dpr = window.devicePixelRatio || 1
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -324,10 +383,25 @@ function drawCurve(ctx: CanvasRenderingContext2D, w: number, h: number, y: Scale
   ctx.stroke(trace(peaks, step, y))
 }
 
+/**
+ * One band per point, drawn as a curve rather than a polyline.
+ *
+ * Each segment is a quadratic through the midpoint between two bands, with the
+ * band itself as the control point. Straight segments put a corner on every
+ * band, and at 256 bands across the panel those corners read as steps that are
+ * not in the audio.
+ */
 function trace(values: Float32Array, step: number, y: Scale) {
-  let d = `M 0 ${y(values[0] ?? FLOOR)}`
-  for (let i = 1; i < values.length; i++) d += ` L ${i * step} ${y(values[i] ?? FLOOR)}`
-  return new Path2D(d)
+  const at = (i: number) => y(values[i] ?? FLOOR)
+  const last = values.length - 1
+
+  let d = `M 0 ${at(0)}`
+  for (let i = 1; i < last; i++) {
+    const mid = (i + 0.5) * step
+    d += ` Q ${i * step} ${at(i)} ${mid} ${(at(i) + at(i + 1)) / 2}`
+  }
+
+  return new Path2D(`${d} L ${last * step} ${at(last)}`)
 }
 
 /** The reading under the pointer, which is what an EQ move is aimed at. */
@@ -377,6 +451,21 @@ function drawCursor(
   ctx.fillText(label, boxX + 8, boxY + 11)
 }
 
+function dbLabel(db: number) {
+  return db <= FLOOR ? '—' : `${db.toFixed(1)} dBFS`
+}
+
+/** The device select, wearing the same greys as the buttons beside it. */
+const SELECT = {
+  base: 'w-[430px] rounded-[9px] bg-white/5 text-ink-2 hover:bg-white/9',
+  placeholder: 'text-ink-5',
+  trailingIcon: 'text-ink-4',
+  content: 'bg-panel rounded-[11px] ring ring-white/8 shadow-xl',
+  viewport: 'p-1 divide-y-0',
+  item: 'rounded-lg text-ink-3 data-highlighted:text-ink data-highlighted:before:bg-white/7',
+  itemTrailingIcon: 'text-accent',
+}
+
 const BUTTON =
   'rounded-[9px] px-4 py-1.5 text-[15px] font-medium transition-colors disabled:opacity-40'
 const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
@@ -392,16 +481,17 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
         <UTooltip
           text="Windows capture endpoints, the same list a chat client offers. The console's Chat endpoint carries the USB 1 Comms column of the matrix; Main Multitrack carries USB 1 Main."
         >
-          <select
+          <!-- Nuxt UI's own neutral palette is a lighter grey than this app's,
+               so every slot that carries a colour is given one from the theme. -->
+          <USelect
             v-model="chosen"
-            class="rta-select max-w-[320px] truncate rounded-[9px] bg-white/5 px-3 py-1.5 text-[15px] text-ink-2 outline-none transition-colors hover:bg-white/9"
-            @change="restart"
-          >
-            <option v-if="!devices.length" value="">No capture device</option>
-            <option v-for="d in devices" :key="d.name" :value="d.name">
-              {{ d.name }}{{ d.default ? ' (system default)' : '' }}
-            </option>
-          </select>
+            :items="deviceItems"
+            :placeholder="devices.length ? 'Choose a capture device' : 'No capture device'"
+            variant="none"
+            size="lg"
+            :ui="SELECT"
+            @update:model-value="restart"
+          />
         </UTooltip>
       </div>
 
@@ -451,34 +541,39 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
         {{ starting ? 'Opening the capture device…' : 'No capture device is running.' }}
       </div>
 
-      <div class="pointer-events-none absolute right-3 top-3 flex items-center gap-2.5">
+      <!-- Left, clear of the dB scale, which starts one gridline down. -->
+      <div class="pointer-events-none absolute left-3 top-2.5 flex flex-col items-start gap-1">
+        <div class="tabular-nums text-[13px] leading-tight">
+          <div class="flex gap-2">
+            <span class="w-14 text-ink-5">current</span>
+            <span class="text-ink-3">{{ dbLabel(currentDb) }}</span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-14 text-ink-5">peak</span>
+            <span class="text-ink-2">{{ dbLabel(heldDb) }}</span>
+          </div>
+        </div>
         <span
           v-if="clipping"
           class="rounded-md bg-mute/20 px-2 py-0.5 text-[13px] font-semibold text-mute"
         >
           Clipping
         </span>
-        <span class="tabular-nums text-[13px] text-ink-4">
-          peak {{ peakDb <= FLOOR ? '—' : `${peakDb.toFixed(1)} dBFS` }}
-        </span>
       </div>
     </div>
 
-    <p class="flex-none border-t border-white/5 px-4.5 py-2.5 text-[13px] text-ink-5">
-      <template v-if="info">
+    <div
+      class="flex-none space-y-1 border-t border-white/5 px-4.5 py-2.5 text-[13px] text-ink-5"
+    >
+      <p v-if="info" class="text-ink-4">
         {{ info.device }} · {{ (info.sampleRate / 1000).toFixed(1) }} kHz ·
-        {{ info.channels === 1 ? 'mono' : 'stereo, summed' }} · {{ info.centres.length }} bands.
-      </template>
-      This reads the audio the console sends back over USB, so it hears whatever the matrix routes
-      to that output. For the microphone on its own, leave only that source linked on the matching
-      column. Nothing here writes to the console.
-    </p>
+        {{ info.channels === 1 ? 'mono' : 'stereo, summed' }} · {{ info.centres.length }} bands
+      </p>
+      <p>
+        This reads the audio the console sends back over USB, so it hears whatever the matrix routes
+        to that output. For the microphone on its own, leave only that source linked on the matching
+        column. Nothing here writes to the console.
+      </p>
+    </div>
   </section>
 </template>
-
-<style scoped>
-/* The dropdown itself is drawn by the OS, which otherwise renders it light. */
-.rta-select {
-  color-scheme: dark;
-}
-</style>
