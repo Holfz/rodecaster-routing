@@ -304,14 +304,14 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
         <div class="flex gap-0.5 rounded-[11px] bg-white/5 p-[3px]">
           <button
             type="button"
-            :class="[TAB, view === 'matrix' ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink']"
+            :class="[TAB, view === 'matrix' ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink']"
             @click="view = 'matrix'"
           >
             Matrix
           </button>
           <button
             type="button"
-            :class="[TAB, view === 'rta' ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink']"
+            :class="[TAB, view === 'rta' ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink']"
             @click="view = 'rta'"
           >
             Analyzer
@@ -320,7 +320,7 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
             type="button"
             :class="[
               TAB,
-              view === 'protocol' ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink',
+              view === 'protocol' ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink',
             ]"
             @click="view = 'protocol'"
           >
@@ -336,7 +336,7 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
             <UTooltip text="The nine strips on the console, in fader order.">
               <button
                 type="button"
-                :class="[TAB, !showAll ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink']"
+                :class="[TAB, !showAll ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink']"
                 @click="showAll = false"
               >
                 Fader Inputs
@@ -347,7 +347,7 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
             >
               <button
                 type="button"
-                :class="[TAB, showAll ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink']"
+                :class="[TAB, showAll ? 'bg-accent text-white' : 'text-ink-3 hover:text-ink']"
                 @click="showAll = true"
               >
                 All Inputs

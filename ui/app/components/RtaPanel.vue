@@ -513,7 +513,7 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
               :key="option"
               type="button"
               class="rounded-lg px-3 py-1 text-[14px] font-semibold capitalize transition-colors"
-              :class="smoothing === option ? 'bg-accent text-chrome' : 'text-ink-4 hover:text-ink-2'"
+              :class="smoothing === option ? 'bg-accent text-white' : 'text-ink-4 hover:text-ink-2'"
               @click="smoothing = option"
             >
               {{ option }}
@@ -529,7 +529,7 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
 
         <button
           type="button"
-          :class="[BUTTON, frozen ? 'bg-accent text-chrome' : QUIET]"
+          :class="[BUTTON, frozen ? 'bg-accent text-white' : QUIET]"
           @click="frozen = !frozen"
         >
           {{ frozen ? 'Frozen' : 'Freeze' }}

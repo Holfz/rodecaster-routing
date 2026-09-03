@@ -98,7 +98,7 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
         </UTooltip>
         <button
           type="button"
-          :class="[BUTTON, paused ? 'bg-accent text-chrome' : QUIET]"
+          :class="[BUTTON, paused ? 'bg-accent text-white' : QUIET]"
           @click="paused = !paused"
         >
           {{ paused ? 'Resume' : 'Pause' }}
