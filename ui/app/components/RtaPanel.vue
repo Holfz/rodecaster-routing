@@ -21,6 +21,9 @@ const FALL_DB_PER_SECOND = 16
 
 const GRID_HZ = [20, 30, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000, 20000]
 
+/** The gridline the cursor's label sits on. */
+const LABEL_DB = -24
+
 const PREFS = 'rodecaster-deck.rta'
 
 const devices = ref<CaptureDevice[]>([])
@@ -437,8 +440,11 @@ function drawCursor(
   ctx.font = '600 13px Rajdhani, system-ui, sans-serif'
   const width = ctx.measureText(label).width + 16
 
+  // Parked on one gridline rather than riding the curve: a label that moves
+  // vertically with the reading is hard to read while the reading is what is
+  // being compared across frequencies.
   const boxX = Math.min(Math.max(at + 8, 2), w - width - 2)
-  const boxY = Math.min(Math.max(y(level) - 32, 2), h - 40)
+  const boxY = y(LABEL_DB) - 11
 
   ctx.fillStyle = 'rgb(8 9 9 / 0.92)'
   ctx.beginPath()
@@ -566,7 +572,7 @@ const QUIET = 'bg-white/5 text-ink-3 hover:bg-white/9 hover:text-ink-2'
       class="flex-none space-y-1 border-t border-white/5 px-4.5 py-2.5 text-[13px] text-ink-5"
     >
       <p v-if="info" class="text-ink-4">
-        {{ info.device }} · {{ (info.sampleRate / 1000).toFixed(1) }} kHz ·
+        Device: {{ info.device }} · {{ (info.sampleRate / 1000).toFixed(1) }} kHz ·
         {{ info.channels === 1 ? 'mono' : 'stereo, summed' }} · {{ info.centres.length }} bands
       </p>
       <p>
