@@ -149,3 +149,29 @@ export function swatch(argb: string): string {
 }
 
 
+
+/** A Windows capture endpoint, the same list a chat client offers. */
+export interface CaptureDevice {
+  name: string
+  /** The host's default input. */
+  default: boolean
+  channels: number
+  sampleRate: number
+}
+
+/** What the analyser opened, sent once when capture starts. */
+export interface RtaInfo {
+  device: string
+  sampleRate: number
+  channels: number
+  /** Band centre frequencies, ascending, one per value in a frame's `db`. */
+  centres: number[]
+}
+
+/** One analysis frame, about 23 a second while the RTA page is open. */
+export interface RtaFrame {
+  /** dBFS per band, in `RtaInfo.centres` order. A full-scale sine reads 0. */
+  db: number[]
+  peakDb: number
+  clipped: boolean
+}

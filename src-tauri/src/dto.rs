@@ -212,3 +212,36 @@ pub(crate) struct FrameDto {
     /// True when this frame changed the model, so noise is easy to filter.
     pub(crate) applied: bool,
 }
+
+/// A capture endpoint as Windows lists it. The analyser reads audio off one of
+/// these rather than off the console's HID interface.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CaptureDeviceDto {
+    pub(crate) name: String,
+    pub(crate) default: bool,
+    pub(crate) channels: u16,
+    pub(crate) sample_rate: u32,
+}
+
+/// What the analyser opened, sent once when capture starts.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RtaInfoDto {
+    pub(crate) device: String,
+    pub(crate) sample_rate: u32,
+    pub(crate) channels: u16,
+    /// Band centre frequencies, so the UI can place its frequency axis without
+    /// repeating the band plan.
+    pub(crate) centres: Vec<f32>,
+}
+
+/// One analysis frame, about 23 a second.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RtaFrameDto {
+    /// dBFS per band, in the order `RtaInfoDto::centres` gives.
+    pub(crate) db: Vec<f32>,
+    pub(crate) peak_db: f32,
+    pub(crate) clipped: bool,
+}

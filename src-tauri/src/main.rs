@@ -10,12 +10,14 @@ mod commands;
 mod dto;
 mod listener;
 mod project;
+mod rta;
 
 use commands::{
     read_matrix, set_cell, set_frame_logging, set_input_colour, set_monitor_level,
     set_monitor_mute, set_output_mode,
 };
 use listener::{spawn_listener, LogFrames, Shared};
+use rta::{list_capture_devices, start_rta, stop_rta, Rta};
 use tauri::Manager;
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
@@ -49,6 +51,7 @@ fn main() {
         ))
         .manage(Shared::new(None))
         .manage(LogFrames::new(false))
+        .manage(Rta::new(None))
         .setup(|app| {
             spawn_listener(app.handle().clone());
             apply_default_autostart(app.handle());
@@ -61,7 +64,10 @@ fn main() {
             set_monitor_mute,
             set_monitor_level,
             set_input_colour,
-            set_frame_logging
+            set_frame_logging,
+            list_capture_devices,
+            start_rta,
+            stop_rta
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,7 +11,7 @@ const showAll = ref(false)
 const pending = ref<string | null>(null)
 /** Skip unlink: clicking toggles straight between link and mute. */
 const binaryMode = ref(false)
-const view = ref<'matrix' | 'protocol'>('matrix')
+const view = ref<'matrix' | 'rta' | 'protocol'>('matrix')
 
 const PREFS = 'rodecaster-deck.prefs'
 function restorePrefs() {
@@ -311,6 +311,13 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
           </button>
           <button
             type="button"
+            :class="[TAB, view === 'rta' ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink']"
+            @click="view = 'rta'"
+          >
+            Analyzer
+          </button>
+          <button
+            type="button"
             :class="[
               TAB,
               view === 'protocol' ? 'bg-accent text-chrome' : 'text-ink-3 hover:text-ink',
@@ -457,6 +464,7 @@ const TAB = 'rounded-lg px-5 py-1.5 text-base font-semibold tracking-[0.01em] tr
           :pending="pending"
           @cycle="cycle"
         />
+        <RtaPanel v-else-if="view === 'rta'" @error="error = $event" />
         <ProtocolPanel
           v-else-if="view === 'protocol'"
           v-model:paused="logPaused"

@@ -57,6 +57,13 @@ The list of what it does includes, but is not limited to:
   - Per-source colour, editable from the strip, offering the sixteen colours
     the console will accept and no others
 
+- **Real-time analyser**
+  - The spectrum of what the console sends back over USB, on a log frequency
+    axis with peak hold, for setting a microphone EQ by eye instead of by ear
+  - Reads a capture device, the same way a chat client reads a microphone, so
+    it hears whatever the matrix routes to that USB output
+  - Read-only: it sends nothing to the console
+
 - **Device**
   - Studio monitor mute and volume, which the RØDECaster App does not expose
   - Live updates, including changes made on the hardware or in the RØDECaster
@@ -72,7 +79,8 @@ The list of what it does includes, but is not limited to:
 
 The console exposes a vendor-specific HID interface alongside its audio, MIDI
 and storage ones. That interface is bidirectional and carries the control
-protocol. This app uses only that interface, and touches nothing else.
+protocol. Everything this app *controls*, it controls through that one
+interface. The analyser is the exception, and it only listens: see below.
 
 **Reading is a single request, then a subscription.** On connect the app asks
 once for the console's state. The console answers with all of it, roughly
@@ -91,6 +99,14 @@ answer to learn nothing most of the time. One read on connect, then events.
 **Writing is per operation.** The device handle is opened for the length of a
 single command and closed again, so this app and the RØDECaster App can be open
 at the same time without fighting over the interface.
+
+**The analyser does not use the protocol at all.** The console's USB returns
+appear on the host as ordinary capture endpoints, the ones a chat client lists
+as microphones. The spectrum is read off one of those, so nothing about the
+analyser depends on the reverse-engineered protocol and nothing it does can
+reach the console. Which sources it hears is decided by the routing matrix:
+the console's Chat endpoint carries the `USB 1 Comms` column, and Main
+Multitrack carries `USB 1 Main`.
 
 **Addresses come from the console, not from constants.** Objects are numbered by
 their position in the state dump, so the numbers shift on hardware with a
@@ -139,6 +155,7 @@ crates/
   rcp-proto/      frame layout, value types, the state-dump parser
   rcp-model/      routing matrix, labels, commands
   rcp-transport/  USB HID
+  rcp-rta/        spectrum analysis of a capture device
 src-tauri/        Tauri backend
 ui/               Nuxt 4 and Nuxt UI 4 frontend
 ```

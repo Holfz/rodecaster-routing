@@ -16,6 +16,7 @@ tauri-plugin-autostart = "2.5.1"
 rcp-proto = { workspace = true }
 rcp-model = { workspace = true }
 rcp-transport = { workspace = true }
+rcp-rta = { workspace = true }
 
 [features]
 # Used by `tauri build --debug`.

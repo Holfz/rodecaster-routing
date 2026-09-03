@@ -1,0 +1,10 @@
+[package]
+name = "rcp-rta"
+description = "Real-time spectrum analysis of a capture device, for the RODECaster deck"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cpal = "0.15"
+realfft = "3"
