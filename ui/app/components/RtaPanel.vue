@@ -440,11 +440,13 @@ function drawCursor(
   ctx.font = '600 13px Rajdhani, system-ui, sans-serif'
   const width = ctx.measureText(label).width + 16
 
-  // Parked on one gridline rather than riding the curve: a label that moves
-  // vertically with the reading is hard to read while the reading is what is
-  // being compared across frequencies.
+  // Parked on one gridline while the curve is live, where a label that moved
+  // with the reading would be hard to read. Frozen, the reading holds still, so
+  // it returns to the curve and points at the place it is reporting.
   const boxX = Math.min(Math.max(at + 8, 2), w - width - 2)
-  const boxY = y(LABEL_DB) - 11
+  const boxY = frozen.value
+    ? Math.min(Math.max(y(level) - 32, 2), h - 40)
+    : y(LABEL_DB) - 11
 
   ctx.fillStyle = 'rgb(8 9 9 / 0.92)'
   ctx.beginPath()
