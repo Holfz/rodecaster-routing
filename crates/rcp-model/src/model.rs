@@ -365,6 +365,15 @@ fn offsets(blob: &[u8], ty: &str) -> Vec<usize> {
     find_all(blob, &marker)
 }
 
+/// Records of `ty` ahead of the first `next` record: the run that sits in
+/// front of `next`, not every `ty` in the dump. A 1.7.6 dump carries a second
+/// RCSYNCMIXMINUES and RCSYNCMIX run at ids 671 and 674.
+fn run_before(blob: &[u8], ty: &str, next: &str) -> usize {
+    let end = offsets(blob, next).first().copied().unwrap_or(usize::MAX);
+
+    offsets(blob, ty).iter().filter(|o| **o < end).count()
+}
+
 /// Slice each record of `ty` up to the start of the next one.
 fn records<'a>(blob: &'a [u8], ty: &str) -> Vec<&'a [u8]> {
     let mut marker = vec![0u8];
@@ -541,14 +550,14 @@ pub fn scan(blob: &[u8]) -> Model {
         .filter(|d| d.root.name == "Rodecaster" && !d.root.children.is_empty());
 
     let mixminus = records(blob, "MIXMINUSES");
-    let rcsyncminus = records(blob, "RCSYNCMIXMINUES");
+    let rcsyncminus = run_before(blob, "RCSYNCMIXMINUES", "MIX");
 
     // These two runs sit immediately before MIX, so the base follows from their
     // sizes rather than being asserted: 49 + 13 + 14 = 76, the captured anchor.
     let mix_base = tree
         .as_ref()
         .and_then(|d| d.first_id("MIX"))
-        .unwrap_or(MIXMINUS_BASE + mixminus.len() as u32 + rcsyncminus.len() as u32);
+        .unwrap_or(MIXMINUS_BASE + mixminus.len() as u32 + rcsyncminus as u32);
 
     let mixminus_base = tree
         .as_ref()
@@ -602,7 +611,7 @@ pub fn scan(blob: &[u8]) -> Model {
     let inputsource_base = tree.as_ref().and_then(|d| d.first_id("INPUTSOURCE")).unwrap_or(
         mix_base
             + records(blob, "MIX").len() as u32
-            + records(blob, "RCSYNCMIX").len() as u32
+            + run_before(blob, "RCSYNCMIX", "STREAMERXSTREAMMIX") as u32
             + records(blob, "STREAMERXSTREAMMIX").len() as u32,
     );
 
@@ -663,7 +672,7 @@ pub fn scan(blob: &[u8]) -> Model {
 
     let counts = Counts {
         mixminus: mixminus.len(),
-        rcsyncminus: rcsyncminus.len(),
+        rcsyncminus,
         mix: records(blob, "MIX").len(),
         channel: records(blob, "CHANNEL").len(),
         inputsource: records(blob, "INPUTSOURCE").len(),
@@ -849,6 +858,28 @@ mod base_tests {
         assert_eq!(m.mix_base, 76, "49 + 13 + 14");
         assert_eq!(m.cells[0].id, 232 - 12 * 13, "first cell is Headphones 1 of input row 0");
         assert_eq!(m.output_modes.len(), 13);
+    }
+
+    #[test]
+    fn a_second_run_after_mix_does_not_move_the_base() {
+        let mut blob = Vec::new();
+        for _ in 0..13 {
+            blob.extend_from_slice(b"\0MIXMINUSES\0\x01\x01outputMixMinus\0\x01\x05\x01\x02\0\0\0");
+        }
+        for _ in 0..14 {
+            blob.extend_from_slice(b"\0RCSYNCMIXMINUES\0\x01\x01outputMixMinus\0\x01\x05\x01\0\0\0\0");
+        }
+        blob.extend_from_slice(b"\0MIX\0\x01\x06mixLink\0\x01\x01\x02mixMute\0\x01\x01\x03");
+
+        // Firmware 1.7.6 appends three more RCSYNCMIXMINUES near the end.
+        for _ in 0..3 {
+            blob.extend_from_slice(b"\0RCSYNCMIXMINUES\0\x01\x01outputMixMinus\0\x01\x05\x01\0\0\0\0");
+        }
+
+        let m = scan(&blob);
+        assert_eq!(m.mix_base, 76);
+        assert_eq!(m.counts.rcsyncminus, 14);
+        assert!(!m.warnings().iter().any(|s| s.contains("MIX base")), "got {:?}", m.warnings());
     }
 
     /// End to end on a real dump: the tree path engages and the addressing it
