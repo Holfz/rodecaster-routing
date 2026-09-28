@@ -169,6 +169,15 @@ function applyPatch(p: Patch) {
     return
   }
 
+  if (p.kind === 'channelProcessing') {
+    const strip = m.channels.find(c => c.index === p.index)
+    if (!strip) return
+    strip.bypassProcessing = p.bypassProcessing
+    strip.fxPreset = p.fxPreset
+    strip.processing = p.processing
+    return
+  }
+
   if (p.kind === 'monitorLevel') {
     // While the slider is under the pointer the local value is the truth; the
     // console echoes each step back, and applying those would fight the drag.

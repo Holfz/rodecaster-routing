@@ -57,6 +57,11 @@ pub(crate) struct ChannelDto {
     pub(crate) bypass_processing: bool,
     pub(crate) pan: Option<f64>,
     pub(crate) fx_preset: i32,
+    /// False when the console offers this source no channel processing, so
+    /// the module settings its strip stores do nothing.
+    pub(crate) processing_offered: bool,
+    /// Labels of the processing modules switched on.
+    pub(crate) processing: Vec<&'static str>,
     /// Fader level 0.0-1.0, gathered from the row's linked cells.
     pub(crate) level: Option<f64>,
     pub(crate) level_steps: Option<i32>,
@@ -184,6 +189,13 @@ pub(crate) enum Patch {
         /// The input row this strip drives, so the matrix column can be marked.
         source: i32,
         mute: bool,
+    },
+    #[serde(rename_all = "camelCase")]
+    ChannelProcessing {
+        index: usize,
+        bypass_processing: bool,
+        fx_preset: i32,
+        processing: Vec<&'static str>,
     },
     #[serde(rename_all = "camelCase")]
     MonitorMute { mute: bool },

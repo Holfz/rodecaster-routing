@@ -36,6 +36,10 @@ export interface Channel {
   bypassProcessing: boolean
   pan: number | null
   fxPreset: number
+  /** False when the console offers this source no channel processing. */
+  processingOffered: boolean
+  /** Labels of the processing modules switched on. */
+  processing: string[]
   level: number | null
   levelSteps: number | null
 }
@@ -115,6 +119,13 @@ export type Patch =
     }
   | { kind: 'outputMode'; col: number; mode: number; modeLabel: string; custom: boolean }
   | { kind: 'channelMute'; index: number; source: number; mute: boolean }
+  | {
+      kind: 'channelProcessing'
+      index: number
+      bypassProcessing: boolean
+      fxPreset: number
+      processing: string[]
+    }
   | { kind: 'monitorMute'; mute: boolean }
   | { kind: 'monitorLevel'; level: number }
   | { kind: 'encoderColour'; colour: number }

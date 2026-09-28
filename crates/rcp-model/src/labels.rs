@@ -73,6 +73,9 @@ pub struct Profile {
     pub shape: Shape,
     pub outputs: &'static [OutputLabel],
     pub sources: &'static [SourceLabel],
+    /// Sources whose strip offers no channel processing, though their
+    /// `CHANNEL` still stores the module settings.
+    pub unprocessed: &'static [usize],
 }
 
 /// 0 and 1 are pinned by captured cell ids 232 and 233. The rest follow the
@@ -136,6 +139,9 @@ static PRO_II: Profile = Profile {
     shape: Shape { outputs: 13, input_sources: 30, channels: 10 },
     outputs: PRO_II_OUTPUTS,
     sources: PRO_II_SOURCES,
+    // Smart Pads: its channel settings on the console have no APHEX,
+    // compressor or EQ.
+    unprocessed: &[11],
 };
 
 /// No Duo entry: its shape is predictable from the spec sheet but its labels
@@ -176,6 +182,12 @@ impl Labels {
             .map(str::to_string)
             .unwrap_or_else(|| format!("source {src}"))
     }
+
+    /// False only for a source known to have no channel processing. An
+    /// unrecognised console reports true, as its strips store the settings.
+    pub fn processing_offered(&self, src: usize) -> bool {
+        !self.profile.is_some_and(|p| p.unprocessed.contains(&src))
+    }
 }
 
 /// Only reached before the first dump, since the console reports `inputColour`
@@ -197,6 +209,13 @@ mod tests {
         assert_eq!(l.input(12), "RC Game");
         assert_eq!(l.input(13), "RC Music");
         assert_eq!(l.input(11), "Smart Pads");
+    }
+
+    #[test]
+    fn smart_pads_offer_no_channel_processing() {
+        let l = Labels::for_shape(PRO_II_SHAPE);
+        assert!(!l.processing_offered(11));
+        assert!(l.processing_offered(0));
     }
 
     #[test]
@@ -240,6 +259,9 @@ mod tests {
             }
             for s in p.sources {
                 assert!(s.src < p.shape.input_sources, "{} source {}", p.name, s.src);
+            }
+            for src in p.unprocessed {
+                assert!(*src < p.shape.input_sources, "{} unprocessed {src}", p.name);
             }
         }
     }

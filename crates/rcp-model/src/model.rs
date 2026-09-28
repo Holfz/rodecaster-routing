@@ -258,8 +258,34 @@ pub struct Channel {
     pub talkback: bool,
     pub bypass_processing: bool,
     pub pan: Option<f64>,
+    /// Index into `FXPRESETS`. -1 means no saved preset is selected, not that
+    /// processing is off: a strip set up by hand reads -1 with every module on.
     pub fx_preset: i32,
+    /// Per entry of `PROCESSING`, whether that module is switched on.
+    pub processing: [bool; PROCESSING.len()],
 }
+
+impl Channel {
+    /// Labels of the processing modules switched on.
+    pub fn processing_on(&self) -> Vec<&'static str> {
+        PROCESSING
+            .iter()
+            .zip(self.processing)
+            .filter_map(|((_, label), on)| on.then_some(*label))
+            .collect()
+    }
+}
+
+/// A strip's processing modules: the on/off property of each on `CHANNEL`,
+/// and a label for it.
+pub const PROCESSING: [(&str, &str); 6] = [
+    ("hpfOn", "HPF"),
+    ("noiseGateOn", "Noise gate"),
+    ("deesserOn", "De-esser"),
+    ("compressorOn", "Compressor"),
+    ("eqOn", "EQ"),
+    ("aphexOn", "APHEX"),
+];
 
 /// The level shared by a row's linked cells, i.e. the channel's fader.
 ///
@@ -411,6 +437,8 @@ pub enum Changed {
     OutputMode(usize),
     /// Strip index.
     ChannelMute(usize),
+    /// Strip index: its bypass, FX preset or a processing module changed.
+    ChannelProcessing(usize),
     /// The studio monitor mute, which belongs to the device rather than a cell.
     MonitorMute,
     /// The studio monitor volume, likewise device-wide.
@@ -497,6 +525,24 @@ pub fn apply_event(model: &mut Model, frame: &rcp_proto::Frame) -> Option<Change
             }
         }
 
+        (name, Some(value)) if is_processing_prop(name) => {
+            let index = id.checked_sub(model.channel_base)? as usize;
+            let c = model.channels.iter_mut().find(|c| c.index == index)?;
+
+            let changed = match (name, value) {
+                ("channelBypassProcessing", Value::Bool(b)) => {
+                    std::mem::replace(&mut c.bypass_processing, *b) != *b
+                }
+                ("channelCurrentFxPreset", Value::Int(v)) => std::mem::replace(&mut c.fx_preset, *v) != *v,
+                (_, Value::Bool(b)) => {
+                    let slot = PROCESSING.iter().position(|(n, _)| *n == name)?;
+                    std::mem::replace(&mut c.processing[slot], *b) != *b
+                }
+                _ => false,
+            };
+            return changed.then_some(Changed::ChannelProcessing(index));
+        }
+
         ("inputColour", Some(Value::Str(hex))) => {
             if let Some(src) = id.checked_sub(model.inputsource_base).map(|i| i as usize) {
                 if let Some(slot) = model.input_colours.get_mut(src) {
@@ -536,6 +582,12 @@ pub fn apply_event(model: &mut Model, frame: &rcp_proto::Frame) -> Option<Change
         _ => {}
     }
     None
+}
+
+fn is_processing_prop(name: &str) -> bool {
+    name == "channelBypassProcessing"
+        || name == "channelCurrentFxPreset"
+        || PROCESSING.iter().any(|(n, _)| *n == name)
 }
 
 pub fn scan(blob: &[u8]) -> Model {
@@ -638,6 +690,7 @@ pub fn scan(blob: &[u8]) -> Model {
                 bypass_processing: prop_bool(rec, "channelBypassProcessing").unwrap_or(false),
                 pan: prop_f64(rec, "channelPan"),
                 fx_preset: prop_i32(rec, "channelCurrentFxPreset").unwrap_or(-1),
+                processing: PROCESSING.map(|(name, _)| prop_bool(rec, name).unwrap_or(false)),
             }
         })
         .collect();
@@ -1177,6 +1230,50 @@ mod channel_base_tests {
         assert!(apply_event(&mut m, &f).is_some());
         assert!(m.channels[2].mute, "strip 2 should be muted");
         assert!(!m.channels[0].mute, "and no other strip touched");
+    }
+
+    #[test]
+    fn a_hand_set_strip_reports_its_modules_without_a_preset() {
+        // Combo 1 on a 1.7.6 console: every module on, no saved preset.
+        let mut blob = b"\0CHANNEL\0\x01\x08channelInputSource\0\x01\x05\x01\0\0\0\0".to_vec();
+        blob.extend_from_slice(b"channelCurrentFxPreset\0\x01\x05\x01\xff\xff\xff\xff");
+        for (name, _) in PROCESSING {
+            blob.extend_from_slice(name.as_bytes());
+            blob.extend_from_slice(b"\0\x01\x01\x02");
+        }
+
+        let m = scan(&blob);
+        let ch = &m.channels[0];
+        assert_eq!(ch.fx_preset, -1);
+        assert_eq!(ch.processing_on().len(), PROCESSING.len());
+    }
+
+    #[test]
+    fn a_pushed_module_switch_lands_on_the_right_strip() {
+        let mut blob = Vec::new();
+        for i in 0..10u8 {
+            blob.extend_from_slice(b"\0CHANNEL\0\x01\x02channelInputSource\0\x01\x05\x01");
+            blob.extend_from_slice(&(i as i32).to_le_bytes());
+            blob.extend_from_slice(b"compressorOn\0\x01\x01\x03");
+        }
+        for _ in 0..11 {
+            blob.extend_from_slice(b"\0EFFECTS_PARAMETERS\0\x01\x01effectsIdx\0\x01\x05\x01\0\0\0\0");
+        }
+        for _ in 0..13 {
+            blob.extend_from_slice(b"\0MIXMINUSES\0\x01\x01outputMixMinus\0\x01\x05\x01\x02\0\0\0");
+        }
+        let mut m = scan(&blob);
+
+        let bytes = rcp_proto::Frame::encode(rcp_proto::RID_EVENT, &[29], "compressorOn", &[1, 1, 2]);
+        let f = rcp_proto::Frame::parse(&bytes).unwrap();
+        assert_eq!(apply_event(&mut m, &f), Some(Changed::ChannelProcessing(1)));
+        assert_eq!(m.channels[1].processing_on(), ["Compressor"]);
+        assert!(m.channels[0].processing_on().is_empty());
+
+        // id 40 is an EFFECTS_PARAMETERS object, past the last strip.
+        let bytes = rcp_proto::Frame::encode(rcp_proto::RID_EVENT, &[40], "compressorOn", &[1, 1, 2]);
+        let f = rcp_proto::Frame::parse(&bytes).unwrap();
+        assert_eq!(apply_event(&mut m, &f), None);
     }
 }
 

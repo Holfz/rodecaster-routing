@@ -96,6 +96,8 @@ pub(crate) fn build(model: &Model, read_ms: u128) -> MatrixDto {
             bypass_processing: c.bypass_processing,
             pan: c.pan,
             fx_preset: c.fx_preset,
+            processing_offered: names.processing_offered(c.source as usize),
+            processing: c.processing_on(),
             level: model.strip_level(c.source),
             level_steps: model.strip_level_steps(c.source),
         })

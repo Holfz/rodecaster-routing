@@ -46,6 +46,15 @@ pub(crate) fn patch_for(model: &Model, changed: rcp_model::model::Changed) -> Op
             let ch = model.channels.iter().find(|c| c.index == index)?;
             Patch::ChannelMute { index, source: ch.source, mute: ch.mute }
         }
+        Changed::ChannelProcessing(index) => {
+            let ch = model.channels.iter().find(|c| c.index == index)?;
+            Patch::ChannelProcessing {
+                index,
+                bypass_processing: ch.bypass_processing,
+                fx_preset: ch.fx_preset,
+                processing: ch.processing_on(),
+            }
+        }
         Changed::MonitorMute => Patch::MonitorMute { mute: model.info.monitor_mute? },
         Changed::MonitorLevel => Patch::MonitorLevel { level: model.info.monitor_level? },
         Changed::EncoderColour => Patch::EncoderColour { colour: model.info.encoder_colour? },

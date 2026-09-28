@@ -39,8 +39,19 @@ function reach(ch: Channel) {
  * preset is selected underneath cannot be heard — saying "bypassed" and "no
  * FX" side by side told the same thing twice. Bypass therefore wins, and the
  * preset is only worth naming when it is actually in circuit.
+ *
+ * `fxPreset` -1 means no saved preset is selected, not that processing is off:
+ * a strip set up by hand reads -1 with every module on.
  */
 function processing(ch: Channel) {
+  // Checked first: such a strip still stores module settings, and they do nothing.
+  if (!ch.processingOffered) {
+    return {
+      label: 'No FX',
+      hot: false,
+      title: 'The console offers this source no channel processing.',
+    }
+  }
   if (ch.bypassProcessing) {
     return {
       label: 'Bypassed',
@@ -56,10 +67,17 @@ function processing(ch: Channel) {
       title: `FX preset ${ch.fxPreset} is in circuit.`,
     }
   }
+  if (ch.processing.length) {
+    return {
+      label: 'FX on',
+      hot: true,
+      title: `No saved FX preset; set on the strip: ${ch.processing.join(', ')}.`,
+    }
+  }
   return {
     label: 'No FX',
     hot: false,
-    title: 'Processing is in circuit, but no FX preset is selected.',
+    title: 'Processing is in circuit, but every module is switched off.',
   }
 }
 
