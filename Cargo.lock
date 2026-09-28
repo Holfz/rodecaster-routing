@@ -2711,18 +2711,18 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "rcp-model"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rcp-proto",
 ]
 
 [[package]]
 name = "rcp-proto"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "rcp-rta"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cpal",
  "realfft",
@@ -2730,7 +2730,7 @@ dependencies = [
 
 [[package]]
 name = "rcp-transport"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "hidapi",
  "rcp-model",
@@ -2862,7 +2862,7 @@ dependencies = [
 
 [[package]]
 name = "rodecaster-deck"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rcp-model",
  "rcp-proto",
